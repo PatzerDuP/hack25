@@ -1,11 +1,16 @@
 from flask import Flask, request, render_template_string
 from google.cloud import storage
+import mysql.connector
 import os
 
 app = Flask(__name__)
 
-# Configure your bucket name here
+# Configure your bucket name and MySQL credentials
 GCS_BUCKET = "hackathon25-bucket"
+DB_HOST = '34.42.130.81'  # e.g., Cloud SQL public IP or docker container hostname
+DB_USER = 'admin'
+DB_PASSWORD = 'admin-hackathon'
+DB_NAME = 'Hackathon'
 
 UPLOAD_FORM = """
 <!doctype html>
@@ -28,6 +33,7 @@ def upload_csv():
 
     file = request.files['file']
     filename = file.filename
+    table_name = os.path.splitext(filename)[0].replace('-', '_')
     local_path = f"/tmp/{filename}"
     file.save(local_path)
 
@@ -40,7 +46,29 @@ def upload_csv():
     except Exception as e:
         return f'File saved locally, but failed to upload to GCS: {e}', 500
 
-    return f'File {filename} uploaded successfully to container and GCS.'
+    # Connect to MySQL and prepare the table
+    try:
+        connection = mysql.connector.connect(
+            host=DB_HOST,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME
+        )
+        cursor = connection.cursor()
+        cursor.execute(f"DROP TABLE IF EXISTS `{table_name}`;")
+        cursor.execute(f"""
+            CREATE TABLE `{table_name}` (
+                id INT AUTO_INCREMENT PRIMARY KEY
+                -- Add your columns here later based on CSV
+            );
+        """)
+        connection.commit()
+        cursor.close()
+        connection.close()
+    except mysql.connector.Error as err:
+        return f'Failed to prepare MySQL table: {err}', 500
+
+    return f'File {filename} uploaded to GCS and MySQL table `{table_name}` was reset.'
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
