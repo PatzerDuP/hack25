@@ -8,7 +8,7 @@ app = Flask(__name__)
 # Configure your bucket name and MySQL credentials
 GCS_BUCKET = "hackathon25-bucket"
 GCS_SUBFOLDER = "PremTables"
-DB_HOST = '34.42.130.81'  # e.g., Cloud SQL public IP or docker container hostname
+DB_CONNECTION_NAME = 'hackathon25-459214:us-central1:hackathon-mysql'
 DB_USER = 'admin'
 DB_PASSWORD = 'admin-hackathon'
 DB_NAME = 'Hackathon'
@@ -47,13 +47,13 @@ def upload_csv():
     except Exception as e:
         return f'File saved locally, but failed to upload to GCS: {e}', 500
 
-    # Connect to MySQL and prepare the table
+    # Connect to MySQL via Cloud SQL Auth Proxy socket
     try:
         connection = mysql.connector.connect(
-            host=DB_HOST,
             user=DB_USER,
             password=DB_PASSWORD,
             database=DB_NAME,
+            unix_socket=f"/cloudsql/{DB_CONNECTION_NAME}",
             connection_timeout=10
         )
         cursor = connection.cursor()
