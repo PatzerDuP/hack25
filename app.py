@@ -7,6 +7,7 @@ app = Flask(__name__)
 
 # Configure your bucket name and MySQL credentials
 GCS_BUCKET = "hackathon25-bucket"
+GCS_SUBFOLDER = "PremTables"
 DB_HOST = '34.42.130.81'  # e.g., Cloud SQL public IP or docker container hostname
 DB_USER = 'admin'
 DB_PASSWORD = 'admin-hackathon'
@@ -37,11 +38,11 @@ def upload_csv():
     local_path = f"/tmp/{filename}"
     file.save(local_path)
 
-    # Upload to GCS
+    # Upload to GCS subfolder
     try:
         client = storage.Client()
         bucket = client.bucket(GCS_BUCKET)
-        blob = bucket.blob(filename)
+        blob = bucket.blob(f"{GCS_SUBFOLDER}/{filename}")
         blob.upload_from_filename(local_path)
     except Exception as e:
         return f'File saved locally, but failed to upload to GCS: {e}', 500
@@ -52,7 +53,8 @@ def upload_csv():
             host=DB_HOST,
             user=DB_USER,
             password=DB_PASSWORD,
-            database=DB_NAME
+            database=DB_NAME,
+            connection_timeout=10
         )
         cursor = connection.cursor()
         cursor.execute(f"DROP TABLE IF EXISTS `{table_name}`;")
@@ -68,7 +70,7 @@ def upload_csv():
     except mysql.connector.Error as err:
         return f'Failed to prepare MySQL table: {err}', 500
 
-    return f'File {filename} uploaded to GCS and MySQL table `{table_name}` was reset.'
+    return f'File {filename} uploaded to GCS folder "{GCS_SUBFOLDER}" and MySQL table `{table_name}` was reset.'
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
