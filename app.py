@@ -2,16 +2,21 @@ from flask import Flask, request, render_template_string
 from google.cloud import storage
 import mysql.connector
 import os
+from googleapiclient import discovery
+from google.auth import default
 
 app = Flask(__name__)
 
 # Configure your bucket name and MySQL credentials
 GCS_BUCKET = "hackathon25-bucket"
 GCS_SUBFOLDER = "PremTables"
-DB_CONNECTION_NAME = 'hack25-463119576432:us-central1:hackathon-db'
+DB_CONNECTION_NAME = 'hackathon25-459214:us-central1:hackathon-mysql'
 DB_USER = 'admin'
 DB_PASSWORD = 'admin-hackathon'
 DB_NAME = 'Hackathon'
+PROJECT_ID = 'hackathon25-459214'
+INSTANCE_ID = 'hackathon-db'
+REGION = 'us-central1'
 
 UPLOAD_FORM = """
 <!doctype html>
@@ -22,6 +27,30 @@ UPLOAD_FORM = """
   <input type=submit value=Upload>
 </form>
 """
+
+def cloudsql_import(bucket_name, object_path, table_name):
+    credentials, _ = default()
+    service = discovery.build('sqladmin', 'v1beta4', credentials=credentials)
+
+    body = {
+        "importContext": {
+            "fileType": "CSV",
+            "uri": f"gs://{bucket_name}/{object_path}",
+            "database": DB_NAME,
+            "csvImportOptions": {
+                "table": table_name,
+                "columns": ["ID", "Premium"]
+            }
+        }
+    }
+
+    request = service.instances().import_(
+        project=PROJECT_ID,
+        instance=INSTANCE_ID,
+        body=body
+    )
+    response = request.execute()
+    return response
 
 @app.route('/', methods=['GET'])
 def index():
@@ -39,10 +68,11 @@ def upload_csv():
     file.save(local_path)
 
     # Upload to GCS subfolder
+    gcs_path = f"{GCS_SUBFOLDER}/{filename}"
     try:
         client = storage.Client()
         bucket = client.bucket(GCS_BUCKET)
-        blob = bucket.blob(f"{GCS_SUBFOLDER}/{filename}")
+        blob = bucket.blob(gcs_path)
         blob.upload_from_filename(local_path)
     except Exception as e:
         return f'File saved locally, but failed to upload to GCS: {e}', 500
@@ -71,7 +101,12 @@ def upload_csv():
     except mysql.connector.Error as err:
         return f'Failed to prepare MySQL table: {err}', 500
 
-    return f'File {filename} uploaded to GCS folder "{GCS_SUBFOLDER}" and MySQL table `{table_name}` was reset with columns ID and Premium.'
+    try:
+        response = cloudsql_import(GCS_BUCKET, gcs_path, table_name)
+    except Exception as e:
+        return f'Import to MySQL failed: {e}', 500
+
+    return f'File {filename} uploaded to GCS folder "{GCS_SUBFOLDER}" and imported into MySQL table `{table_name}`.'
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
