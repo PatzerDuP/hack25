@@ -11,7 +11,7 @@ app = Flask(__name__)
 # Configure your bucket name and MySQL credentials
 GCS_BUCKET = "hackathon25-bucket"
 GCS_SUBFOLDER = "PremTables"
-DB_CONNECTION_NAME = 'hack25-459214:us-central1:hackathon-db'
+DB_CONNECTION_NAME = 'hackathon25-459214:us-central1:hackathon-db'
 DB_USER = 'admin'
 DB_PASSWORD = 'admin-hackathon'
 DB_NAME = 'Hackathon'
