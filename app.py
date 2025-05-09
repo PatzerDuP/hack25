@@ -8,7 +8,7 @@ app = Flask(__name__)
 # Configure your bucket name and MySQL credentials
 GCS_BUCKET = "hackathon25-bucket"
 GCS_SUBFOLDER = "PremTables"
-DB_CONNECTION_NAME = 'hackathon25-459214:us-central1:hackathon-mysql'
+DB_CONNECTION_NAME = 'hack25-463119576432:us-central1:hackathon-db'
 DB_USER = 'admin'
 DB_PASSWORD = 'admin-hackathon'
 DB_NAME = 'Hackathon'
@@ -60,8 +60,9 @@ def upload_csv():
         cursor.execute(f"DROP TABLE IF EXISTS `{table_name}`;")
         cursor.execute(f"""
             CREATE TABLE `{table_name}` (
-                id INT AUTO_INCREMENT PRIMARY KEY
-                -- Add your columns here later based on CSV
+                ID VARCHAR(20) NOT NULL,
+                Premium DECIMAL(10, 2),
+                PRIMARY KEY (ID)
             );
         """)
         connection.commit()
@@ -70,7 +71,7 @@ def upload_csv():
     except mysql.connector.Error as err:
         return f'Failed to prepare MySQL table: {err}', 500
 
-    return f'File {filename} uploaded to GCS folder "{GCS_SUBFOLDER}" and MySQL table `{table_name}` was reset.'
+    return f'File {filename} uploaded to GCS folder "{GCS_SUBFOLDER}" and MySQL table `{table_name}` was reset with columns ID and Premium.'
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
