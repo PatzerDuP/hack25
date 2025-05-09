@@ -1,6 +1,11 @@
 from flask import Flask, request, render_template_string
+from google.cloud import storage
+import os
 
 app = Flask(__name__)
+
+# Configure your bucket name here
+GCS_BUCKET = "hackathon25-bucket"
 
 UPLOAD_FORM = """
 <!doctype html>
@@ -23,9 +28,19 @@ def upload_csv():
 
     file = request.files['file']
     filename = file.filename
-    file.save(f"/tmp/{filename}")  # save to container's local storage
+    local_path = f"/tmp/{filename}"
+    file.save(local_path)
 
-    return f'File {filename} uploaded successfully to container.'
+    # Upload to GCS
+    try:
+        client = storage.Client()
+        bucket = client.bucket(GCS_BUCKET)
+        blob = bucket.blob(filename)
+        blob.upload_from_filename(local_path)
+    except Exception as e:
+        return f'File saved locally, but failed to upload to GCS: {e}', 500
+
+    return f'File {filename} uploaded successfully to container and GCS.'
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
