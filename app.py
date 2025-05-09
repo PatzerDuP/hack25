@@ -4,13 +4,14 @@ import mysql.connector
 import os
 from googleapiclient import discovery
 from google.auth import default
+import traceback
 
 app = Flask(__name__)
 
 # Configure your bucket name and MySQL credentials
 GCS_BUCKET = "hackathon25-bucket"
 GCS_SUBFOLDER = "PremTables"
-DB_CONNECTION_NAME = 'hackathon25-459214:us-central1:hackathon-mysql'
+DB_CONNECTION_NAME = 'hack25-463119576432:us-central1:hackathon-db'
 DB_USER = 'admin'
 DB_PASSWORD = 'admin-hackathon'
 DB_NAME = 'Hackathon'
@@ -44,13 +45,19 @@ def cloudsql_import(bucket_name, object_path, table_name):
         }
     }
 
-    request = service.instances().import_(
-        project=PROJECT_ID,
-        instance=INSTANCE_ID,
-        body=body
-    )
-    response = request.execute()
-    return response
+    try:
+        request = service.instances().import_(
+            project=PROJECT_ID,
+            instance=INSTANCE_ID,
+            body=body
+        )
+        response = request.execute()
+        print("Cloud SQL import response:", response)
+        return response
+    except Exception as e:
+        print("Error during Cloud SQL import:", e)
+        traceback.print_exc()
+        raise
 
 @app.route('/', methods=['GET'])
 def index():
@@ -99,11 +106,13 @@ def upload_csv():
         cursor.close()
         connection.close()
     except mysql.connector.Error as err:
+        traceback.print_exc()
         return f'Failed to prepare MySQL table: {err}', 500
 
     try:
         response = cloudsql_import(GCS_BUCKET, gcs_path, table_name)
     except Exception as e:
+        traceback.print_exc()
         return f'Import to MySQL failed: {e}', 500
 
     return f'File {filename} uploaded to GCS folder "{GCS_SUBFOLDER}" and imported into MySQL table `{table_name}`.'
